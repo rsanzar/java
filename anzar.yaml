@@ -1,0 +1,58 @@
+apps:
+  # ==========================================
+  # APP 1: SPRING BOOT (Maven/JDK builder -> JRE runner)
+  # ==========================================
+  bench-spring:
+    ci:
+      jobs:
+        - name: build-spring
+          runtime: java-maven-latest
+          tshirt: standard
+          commands:
+            # 1. Build executable fat jar (deps cached in /root/.m2)
+            - cd spring-app && mvn -B -q -DskipTests package
+            # 2. Copy jar to persistent /app drive
+            - mkdir -p /app/spring
+            - cp spring-app/target/bench-spring.jar /app/spring/app.jar
+
+    cd:
+      runtime: java-jre-latest
+      tshirt: standard
+      type: warm
+      start_commands:
+        - sysctl -w net.ipv4.ip_local_port_range="1024 65535" || true
+        - sysctl -w net.ipv4.tcp_tw_reuse=1 || true
+        - sysctl -w net.core.somaxconn=65535 || true
+        - sysctl -w net.ipv4.tcp_max_syn_backlog=65535 || true
+        - sh -c 'ulimit -n 65535 && exec java -XX:+UseSerialGC -XX:MaxRAMPercentage=75 -XX:-UsePerfData -Djava.security.egd=file:/dev/./urandom -jar /app/spring/app.jar --server.address=0.0.0.0 --server.port=8080'
+      port: 8080
+      connection_limit: 500
+
+  # ==========================================
+  # APP 2: PLAIN JAVA (JDK builder -> JRE runner), zero dependencies
+  # ==========================================
+  bench-plain:
+    ci:
+      jobs:
+        - name: build-plain
+          runtime: java-maven-latest
+          tshirt: standard
+          commands:
+            # 1. Compile with javac (no Maven needed, no deps)
+            - cd plain-app && rm -rf out && javac --release 21 -d out src/main/java/bench/plain/Main.java
+            # 2. Package runnable jar straight onto persistent /app drive
+            - mkdir -p /app/plain
+            - jar --create --file /app/plain/app.jar --main-class bench.plain.Main -C plain-app/out .
+
+    cd:
+      runtime: java-jre-latest
+      tshirt: standard
+      type: warm
+      start_commands:
+        - sysctl -w net.ipv4.ip_local_port_range="1024 65535" || true
+        - sysctl -w net.ipv4.tcp_tw_reuse=1 || true
+        - sysctl -w net.core.somaxconn=65535 || true
+        - sysctl -w net.ipv4.tcp_max_syn_backlog=65535 || true
+        - sh -c 'ulimit -n 65535 && exec java -XX:+UseSerialGC -XX:MaxRAMPercentage=75 -XX:-UsePerfData -Djava.security.egd=file:/dev/./urandom -jar /app/plain/app.jar --host 0.0.0.0 --port 8080'
+      port: 8080
+      connection_limit: 500

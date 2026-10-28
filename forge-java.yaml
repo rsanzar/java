@@ -1,0 +1,146 @@
+forge:
+  # ==========================================
+  # 1. JAVA BUILDER (Maven 3.9 + Temurin JDK 21, Alpine/musl)
+  #    Used by CI jobs: mvn, javac, jar
+  # ==========================================
+  - name: "Forge: Build Base Image (Java Maven/JDK 21)"
+    action: "build_image"
+    subject: "anzar.cmd.{cluster}.{host}.image.build"
+    payload:
+      context_id: "e2e-job-bench-java-maven-001"
+      image_name: "java-maven-latest"
+      docker_source: "maven:3.9-eclipse-temurin-21-alpine"
+      disk_size: "2G"
+      init_binary_path: "/home/manneta/projects/anzar/target/x86_64-unknown-linux-musl/release/anzar-init"
+      cache_mounts:
+        - /tmp
+        - /root/.m2
+
+  - name: "Forge: Build Snapshot (Java Maven/JDK 21)"
+    action: "build_snapshot"
+    subject: "anzar.cmd.{cluster}.{host}.snapshot.build"
+    payload:
+      context_id: "e2e-job-bench-java-maven-002"
+      env_id: "env-dev-java-maven-42"
+      runtime: "java-maven-latest"
+      tshirt: "standard"
+
+  # ==========================================
+  # 2. JAVA RUNNER (Temurin JRE 21, Alpine/musl)
+  #    Used by CD for both bench-spring and bench-plain
+  # ==========================================
+  - name: "Forge: Build Base Image (Java JRE 21)"
+    action: "build_image"
+    subject: "anzar.cmd.{cluster}.{host}.image.build"
+    payload:
+      context_id: "e2e-job-bench-java-jre-001"
+      image_name: "java-jre-latest"
+      docker_source: "eclipse-temurin:21-jre-alpine"
+      disk_size: "1G"
+      init_binary_path: "/home/manneta/projects/anzar/target/x86_64-unknown-linux-musl/release/anzar-init"
+      cache_mounts:
+        - /tmp
+
+  - name: "Forge: Build Snapshot (Java JRE 21)"
+    action: "build_snapshot"
+    subject: "anzar.cmd.{cluster}.{host}.snapshot.build"
+    payload:
+      context_id: "e2e-job-bench-java-jre-002"
+      env_id: "env-dev-java-jre-42"
+      runtime: "java-jre-latest"
+      tshirt: "standard"
+
+app:
+  # ==========================================
+  # APP 1: BENCH SPRING (Maven builder -> JRE VM)
+  # ==========================================
+  - name: "Engine: Prepare Environment (Bench Spring)"
+    action: "prepare_env"
+    subject: "anzar.cmd.{cluster}.{host}.engine.env.prepare"
+    payload:
+      context_id: "e2e-job-app-bench-spring-001"
+      env_id: "env-app-bench-spring"
+      runtime: "java-maven-latest"
+      tshirt: "standard"
+
+  - name: "Shiroe: Orchestrate Pipeline Saga (Bench Spring)"
+    action: "run_pipeline"
+    subject: "anzar.cmd.{cluster}.{host}.workflow.run_pipeline"
+    payload:
+      context_id: "e2e-job-app-bench-spring-002"
+      env_id: "env-app-bench-spring"
+      git_config:
+        repo_url: "https://github.com/rsanzar/bench-java.git" # <-- your repo
+        branch: "main"
+        commit_hash: "FETCH_HEAD"
+        app_name: "bench-spring"
+
+  - name: "Shiroe: Stage CD Deployment (Bench Spring on JRE)"
+    action: "stage_deployment"
+    subject: "anzar.cmd.{cluster}.{host}.workflow.stage_deployment"
+    payload:
+      context_id: "e2e-cd-stage-bench-spring-001"
+      parent_env_id: "env-app-bench-spring"
+      cd_env_id: "cd-env-prod-bench-spring"
+      app_domain: "bench-spring.sadala.anzar.cloud"
+      compute:
+        type: "serverless"
+  #              scaling:
+  #                  policy: "fixed"
+  #                  instances: 1
+  #              load_balancer: "round_robin"
+
+  - name: "Bifrost & Shiroe: Traffic Verification (Bench Spring)"
+    action: "simulate_traffic"
+    subject: "none"
+    payload:
+      app_domain: "bench-spring.sadala.anzar.cloud"
+      target: "127.0.0.1"
+      requests: 10
+
+  # ==========================================
+  # APP 2: BENCH PLAIN JAVA (JDK builder -> JRE VM)
+  # ==========================================
+  - name: "Engine: Prepare Environment (Bench Plain)"
+    action: "prepare_env"
+    subject: "anzar.cmd.{cluster}.{host}.engine.env.prepare"
+    payload:
+      context_id: "e2e-job-app-bench-plain-001"
+      env_id: "env-app-bench-plain"
+      runtime: "java-maven-latest"
+      tshirt: "standard"
+
+  - name: "Shiroe: Orchestrate Pipeline Saga (Bench Plain)"
+    action: "run_pipeline"
+    subject: "anzar.cmd.{cluster}.{host}.workflow.run_pipeline"
+    payload:
+      context_id: "e2e-job-app-bench-plain-002"
+      env_id: "env-app-bench-plain"
+      git_config:
+        repo_url: "https://github.com/rsanzar/bench-java.git" # <-- your repo
+        branch: "main"
+        commit_hash: "FETCH_HEAD"
+        app_name: "bench-plain"
+
+  - name: "Shiroe: Stage CD Deployment (Bench Plain on JRE)"
+    action: "stage_deployment"
+    subject: "anzar.cmd.{cluster}.{host}.workflow.stage_deployment"
+    payload:
+      context_id: "e2e-cd-stage-bench-plain-001"
+      parent_env_id: "env-app-bench-plain"
+      cd_env_id: "cd-env-prod-bench-plain"
+      app_domain: "bench-plain.sadala.anzar.cloud"
+      compute:
+        type: "serverless"
+  #              scaling:
+  #                  policy: "fixed"
+  #                  instances: 1
+  #              load_balancer: "round_robin"
+
+  - name: "Bifrost & Shiroe: Traffic Verification (Bench Plain)"
+    action: "simulate_traffic"
+    subject: "none"
+    payload:
+      app_domain: "bench-plain.sadala.anzar.cloud"
+      target: "127.0.0.1"
+      requests: 10
