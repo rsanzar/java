@@ -1,3 +1,4 @@
 target/
 plain-app/out/
+plain-app/bench-plain
 *.jar

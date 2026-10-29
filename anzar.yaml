@@ -1,7 +1,19 @@
+# Benchmark matrix: 3 frameworks x 2 modes = 6 apps
+#
+#                  | JVM (Temurin 21 JRE)  | GraalVM native (static musl)
+#   Spring Boot    | bench-spring          | bench-spring-native
+#   Plain Java     | bench-plain           | bench-plain-native
+#   Quarkus        | bench-quarkus         | bench-quarkus-native
+#
+# Builder runtimes:  java-maven-latest (JVM jars)   graal-native-latest (native binaries)
+# Runner runtimes:   java-jre-latest   (JVM apps)   naked-latest        (native apps, plain alpine)
+
 apps:
-  # ==========================================
-  # APP 1: SPRING BOOT (Maven/JDK builder -> JRE runner)
-  # ==========================================
+  # ==========================================================================
+  # JVM MODE
+  # ==========================================================================
+
+  # ---------- Spring Boot (JVM) ----------
   bench-spring:
     ci:
       jobs:
@@ -18,7 +30,7 @@ apps:
     cd:
       runtime: java-jre-latest
       tshirt: standard
-      type: snapstart
+      type: warm
       start_commands:
         - sysctl -w net.ipv4.ip_local_port_range="1024 65535" || true
         - sysctl -w net.ipv4.tcp_tw_reuse=1 || true
@@ -28,9 +40,7 @@ apps:
       port: 8080
       connection_limit: 500
 
-  # ==========================================
-  # APP 2: PLAIN JAVA (JDK builder -> JRE runner), zero dependencies
-  # ==========================================
+  # ---------- Plain Java (JVM) ----------
   bench-plain:
     ci:
       jobs:
@@ -47,12 +57,131 @@ apps:
     cd:
       runtime: java-jre-latest
       tshirt: standard
-      type: snapstart
+      type: warm
       start_commands:
         - sysctl -w net.ipv4.ip_local_port_range="1024 65535" || true
         - sysctl -w net.ipv4.tcp_tw_reuse=1 || true
         - sysctl -w net.core.somaxconn=65535 || true
         - sysctl -w net.ipv4.tcp_max_syn_backlog=65535 || true
         - sh -c 'ulimit -n 65535 && exec java -XX:+UseSerialGC -XX:MaxRAMPercentage=75 -XX:-UsePerfData -Djava.security.egd=file:/dev/./urandom -jar /app/plain/app.jar --host 0.0.0.0 --port 8080'
+      port: 8080
+      connection_limit: 500
+
+  # ---------- Quarkus (JVM) ----------
+  bench-quarkus:
+    ci:
+      jobs:
+        - name: build-quarkus
+          runtime: java-maven-latest
+          tshirt: standard
+          commands:
+            # 1. Build Quarkus fast-jar (target/quarkus-app/ directory)
+            - cd quarkus-app && mvn -B -q -DskipTests package
+            # 2. Copy the whole quarkus-app dir (quarkus-run.jar needs its lib/ app/ quarkus/ siblings)
+            - rm -rf /app/quarkus && mkdir -p /app/quarkus
+            - cp -r quarkus-app/target/quarkus-app /app/quarkus/
+
+    cd:
+      runtime: java-jre-latest
+      tshirt: standard
+      type: warm
+      start_commands:
+        - sysctl -w net.ipv4.ip_local_port_range="1024 65535" || true
+        - sysctl -w net.ipv4.tcp_tw_reuse=1 || true
+        - sysctl -w net.core.somaxconn=65535 || true
+        - sysctl -w net.ipv4.tcp_max_syn_backlog=65535 || true
+        - sh -c 'ulimit -n 65535 && exec java -XX:+UseSerialGC -XX:MaxRAMPercentage=75 -XX:-UsePerfData -Djava.security.egd=file:/dev/./urandom -Dquarkus.http.host=0.0.0.0 -Dquarkus.http.port=8080 -jar /app/quarkus/quarkus-app/quarkus-run.jar'
+      port: 8080
+      connection_limit: 500
+
+  # ==========================================================================
+  # GRAALVM NATIVE MODE  (fully static musl binaries -> run on plain alpine)
+  # NOTE: native-image is RAM hungry (Spring ~4-8 GB, Quarkus ~3-6 GB).
+  #       CI jobs use tshirt "large" (4 GB VM).
+  # ==========================================================================
+
+  # ---------- Spring Boot (native) ----------
+  bench-spring-native:
+    ci:
+      jobs:
+        - name: build-spring-native
+          runtime: graal-native-latest
+          tshirt: large
+          commands:
+            # 1. Spring AOT + native-image (static musl). mvnw bootstraps Maven into /root/.m2/wrapper
+            - sh mvnw -B -q -f spring-app/pom.xml -Pnative,musl -DskipTests native:compile
+            # 2. Copy binary to persistent /app drive
+            - mkdir -p /app/spring-native
+            - cp spring-app/target/bench-spring /app/spring-native/bench-spring
+            - chmod +x /app/spring-native/bench-spring
+
+    cd:
+      runtime: naked-latest
+      tshirt: standard
+      type: warm
+      start_commands:
+        - sysctl -w net.ipv4.ip_local_port_range="1024 65535" || true
+        - sysctl -w net.ipv4.tcp_tw_reuse=1 || true
+        - sysctl -w net.core.somaxconn=65535 || true
+        - sysctl -w net.ipv4.tcp_max_syn_backlog=65535 || true
+        - sh -c 'ulimit -n 65535 && exec /app/spring-native/bench-spring --server.address=0.0.0.0 --server.port=8080'
+      port: 8080
+      connection_limit: 500
+
+  # ---------- Plain Java (native) ----------
+  bench-plain-native:
+    ci:
+      jobs:
+        - name: build-plain-native
+          runtime: graal-native-latest
+          tshirt: large
+          commands:
+            # 1. Compile classes
+            - cd plain-app && rm -rf out && javac --release 21 -d out src/main/java/bench/plain/Main.java
+            # 2. native-image (static musl), no Maven needed
+            - cd plain-app && native-image --static --libc=musl -cp out bench.plain.Main -o bench-plain
+            # 3. Copy binary to persistent /app drive
+            - mkdir -p /app/plain-native
+            - cp plain-app/bench-plain /app/plain-native/bench-plain
+            - chmod +x /app/plain-native/bench-plain
+
+    cd:
+      runtime: naked-latest
+      tshirt: standard
+      type: warm
+      start_commands:
+        - sysctl -w net.ipv4.ip_local_port_range="1024 65535" || true
+        - sysctl -w net.ipv4.tcp_tw_reuse=1 || true
+        - sysctl -w net.core.somaxconn=65535 || true
+        - sysctl -w net.ipv4.tcp_max_syn_backlog=65535 || true
+        - sh -c 'ulimit -n 65535 && exec /app/plain-native/bench-plain --host 0.0.0.0 --port 8080'
+      port: 8080
+      connection_limit: 500
+
+  # ---------- Quarkus (native) ----------
+  bench-quarkus-native:
+    ci:
+      jobs:
+        - name: build-quarkus-native
+          runtime: graal-native-latest
+          tshirt: large
+          commands:
+            # 1. Quarkus native build; "-Dnative" activates the pom profile (static musl args included)
+            - sh mvnw -B -q -f quarkus-app/pom.xml -Dnative -DskipTests package
+            # 2. Copy binary to persistent /app drive
+            - mkdir -p /app/quarkus-native
+            - cp quarkus-app/target/bench-quarkus-1.0.0-runner /app/quarkus-native/bench-quarkus
+            - chmod +x /app/quarkus-native/bench-quarkus
+
+    cd:
+      runtime: naked-latest
+      tshirt: standard
+      type: warm
+      start_commands:
+        - sysctl -w net.ipv4.ip_local_port_range="1024 65535" || true
+        - sysctl -w net.ipv4.tcp_tw_reuse=1 || true
+        - sysctl -w net.core.somaxconn=65535 || true
+        - sysctl -w net.ipv4.tcp_max_syn_backlog=65535 || true
+        - sh -c 'ulimit -n 65535 && exec /app/quarkus-native/bench-quarkus -Dquarkus.http.host=0.0.0.0 -Dquarkus.http.port=8080'
       port: 8080
       connection_limit: 500

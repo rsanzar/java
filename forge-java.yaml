@@ -1,7 +1,7 @@
+# Benchmark matrix: {spring, plain, quarkus} x {JVM, GraalVM native} = 6 apps
 forge:
   # ==========================================
-  # 1. JAVA BUILDER (Maven 3.9 + Temurin JDK 21, Alpine/musl)
-  #    Used by CI jobs: mvn, javac, jar
+  # 1. JVM BUILDER: Maven 3.9 + Temurin JDK 21 (Alpine) -> mvn / javac / jar
   # ==========================================
   - name: "Forge: Build Base Image (Java Maven/JDK 21)"
     action: "build_image"
@@ -26,8 +26,7 @@ forge:
       tshirt: "standard"
 
   # ==========================================
-  # 2. JAVA RUNNER (Temurin JRE 21, Alpine/musl)
-  #    Used by CD for both bench-spring and bench-plain
+  # 2. JVM RUNNER: Temurin JRE 21 (Alpine) -> bench-spring / bench-plain / bench-quarkus
   # ==========================================
   - name: "Forge: Build Base Image (Java JRE 21)"
     action: "build_image"
@@ -50,9 +49,60 @@ forge:
       runtime: "java-jre-latest"
       tshirt: "standard"
 
+  # ==========================================
+  # 3. NATIVE BUILDER: GraalVM CE 21 native-image + musl toolchain (Oracle Linux)
+  #    -> static --libc=musl binaries. Maven comes from ./mvnw (cached in /root/.m2/wrapper)
+  # ==========================================
+  - name: "Forge: Build Base Image (GraalVM Native 21)"
+    action: "build_image"
+    subject: "anzar.cmd.{cluster}.{host}.image.build"
+    payload:
+      context_id: "e2e-job-bench-graal-native-001"
+      image_name: "graal-native-latest"
+      docker_source: "ghcr.io/graalvm/native-image-community:21-muslib"
+      disk_size: "4G"
+      init_binary_path: "/home/manneta/projects/anzar/target/x86_64-unknown-linux-musl/release/anzar-init"
+      cache_mounts:
+        - /tmp
+        - /root/.m2
+
+  - name: "Forge: Build Snapshot (GraalVM Native 21)"
+    action: "build_snapshot"
+    subject: "anzar.cmd.{cluster}.{host}.snapshot.build"
+    payload:
+      context_id: "e2e-job-bench-graal-native-002"
+      env_id: "env-dev-graal-native-42"
+      runtime: "graal-native-latest"
+      tshirt: "large"
+
+  # ==========================================
+  # 4. NATIVE RUNNER: plain Alpine -> bench-*-native (static binaries, no JVM)
+  #    (same as your existing naked-latest; skip if already built)
+  # ==========================================
+  - name: "Forge: Build Base Image (Naked)"
+    action: "build_image"
+    subject: "anzar.cmd.{cluster}.{host}.image.build"
+    payload:
+      context_id: "e2e-job-bench-naked-001"
+      image_name: "naked-latest"
+      docker_source: "alpine"
+      disk_size: "2G"
+      init_binary_path: "/home/manneta/projects/anzar/target/x86_64-unknown-linux-musl/release/anzar-init"
+      cache_mounts:
+        - /tmp
+
+  - name: "Forge: Build Snapshot (Naked)"
+    action: "build_snapshot"
+    subject: "anzar.cmd.{cluster}.{host}.snapshot.build"
+    payload:
+      context_id: "e2e-job-bench-naked-002"
+      env_id: "env-dev-naked-42"
+      runtime: "naked-latest"
+      tshirt: "standard"
+
 app:
   # ==========================================
-  # APP 1: BENCH SPRING (Maven builder -> JRE VM)
+  # APP 1: BENCH SPRING (JVM)  (java-maven-latest -> JRE VM)
   # ==========================================
   - name: "Engine: Prepare Environment (Bench Spring)"
     action: "prepare_env"
@@ -70,7 +120,7 @@ app:
       context_id: "e2e-job-app-bench-spring-002"
       env_id: "env-app-bench-spring"
       git_config:
-        repo_url: "https://github.com/rsanzar/bench-java.git" # <-- your repo
+        repo_url: "https://github.com/rsanzar/java.git" # <-- your repo
         branch: "main"
         commit_hash: "FETCH_HEAD"
         app_name: "bench-spring"
@@ -99,7 +149,7 @@ app:
       requests: 10
 
   # ==========================================
-  # APP 2: BENCH PLAIN JAVA (JDK builder -> JRE VM)
+  # APP 2: BENCH PLAIN JAVA (JVM)  (java-maven-latest -> JRE VM)
   # ==========================================
   - name: "Engine: Prepare Environment (Bench Plain)"
     action: "prepare_env"
@@ -117,7 +167,7 @@ app:
       context_id: "e2e-job-app-bench-plain-002"
       env_id: "env-app-bench-plain"
       git_config:
-        repo_url: "https://github.com/rsanzar/bench-java.git" # <-- your repo
+        repo_url: "https://github.com/rsanzar/java.git" # <-- your repo
         branch: "main"
         commit_hash: "FETCH_HEAD"
         app_name: "bench-plain"
@@ -142,5 +192,193 @@ app:
     subject: "none"
     payload:
       app_domain: "bench-plain.sadala.anzar.cloud"
+      target: "127.0.0.1"
+      requests: 10
+
+  # ==========================================
+  # APP 3: BENCH QUARKUS (JVM)  (java-maven-latest -> JRE VM)
+  # ==========================================
+  - name: "Engine: Prepare Environment (Bench Quarkus)"
+    action: "prepare_env"
+    subject: "anzar.cmd.{cluster}.{host}.engine.env.prepare"
+    payload:
+      context_id: "e2e-job-app-bench-quarkus-001"
+      env_id: "env-app-bench-quarkus"
+      runtime: "java-maven-latest"
+      tshirt: "standard"
+
+  - name: "Shiroe: Orchestrate Pipeline Saga (Bench Quarkus)"
+    action: "run_pipeline"
+    subject: "anzar.cmd.{cluster}.{host}.workflow.run_pipeline"
+    payload:
+      context_id: "e2e-job-app-bench-quarkus-002"
+      env_id: "env-app-bench-quarkus"
+      git_config:
+        repo_url: "https://github.com/rsanzar/java.git" # <-- your repo
+        branch: "main"
+        commit_hash: "FETCH_HEAD"
+        app_name: "bench-quarkus"
+
+  - name: "Shiroe: Stage CD Deployment (Bench Quarkus on JRE)"
+    action: "stage_deployment"
+    subject: "anzar.cmd.{cluster}.{host}.workflow.stage_deployment"
+    payload:
+      context_id: "e2e-cd-stage-bench-quarkus-001"
+      parent_env_id: "env-app-bench-quarkus"
+      cd_env_id: "cd-env-prod-bench-quarkus"
+      app_domain: "bench-quarkus.sadala.anzar.cloud"
+      compute:
+        type: "serverless"
+  #              scaling:
+  #                  policy: "fixed"
+  #                  instances: 1
+  #              load_balancer: "round_robin"
+
+  - name: "Bifrost & Shiroe: Traffic Verification (Bench Quarkus)"
+    action: "simulate_traffic"
+    subject: "none"
+    payload:
+      app_domain: "bench-quarkus.sadala.anzar.cloud"
+      target: "127.0.0.1"
+      requests: 10
+
+  # ==========================================
+  # APP 4: BENCH SPRING (GraalVM native)  (graal-native-latest -> Naked VM)
+  # ==========================================
+  - name: "Engine: Prepare Environment (Bench Spring Native)"
+    action: "prepare_env"
+    subject: "anzar.cmd.{cluster}.{host}.engine.env.prepare"
+    payload:
+      context_id: "e2e-job-app-bench-spring-native-001"
+      env_id: "env-app-bench-spring-native"
+      runtime: "graal-native-latest"
+      tshirt: "large"
+
+  - name: "Shiroe: Orchestrate Pipeline Saga (Bench Spring Native)"
+    action: "run_pipeline"
+    subject: "anzar.cmd.{cluster}.{host}.workflow.run_pipeline"
+    payload:
+      context_id: "e2e-job-app-bench-spring-native-002"
+      env_id: "env-app-bench-spring-native"
+      git_config:
+        repo_url: "https://github.com/rsanzar/java.git" # <-- your repo
+        branch: "main"
+        commit_hash: "FETCH_HEAD"
+        app_name: "bench-spring-native"
+
+  - name: "Shiroe: Stage CD Deployment (Bench Spring Native on Naked)"
+    action: "stage_deployment"
+    subject: "anzar.cmd.{cluster}.{host}.workflow.stage_deployment"
+    payload:
+      context_id: "e2e-cd-stage-bench-spring-native-001"
+      parent_env_id: "env-app-bench-spring-native"
+      cd_env_id: "cd-env-prod-bench-spring-native"
+      app_domain: "bench-spring-native.sadala.anzar.cloud"
+      compute:
+        type: "serverless"
+  #              scaling:
+  #                  policy: "fixed"
+  #                  instances: 1
+  #              load_balancer: "round_robin"
+
+  - name: "Bifrost & Shiroe: Traffic Verification (Bench Spring Native)"
+    action: "simulate_traffic"
+    subject: "none"
+    payload:
+      app_domain: "bench-spring-native.sadala.anzar.cloud"
+      target: "127.0.0.1"
+      requests: 10
+
+  # ==========================================
+  # APP 5: BENCH PLAIN JAVA (GraalVM native)  (graal-native-latest -> Naked VM)
+  # ==========================================
+  - name: "Engine: Prepare Environment (Bench Plain Native)"
+    action: "prepare_env"
+    subject: "anzar.cmd.{cluster}.{host}.engine.env.prepare"
+    payload:
+      context_id: "e2e-job-app-bench-plain-native-001"
+      env_id: "env-app-bench-plain-native"
+      runtime: "graal-native-latest"
+      tshirt: "large"
+
+  - name: "Shiroe: Orchestrate Pipeline Saga (Bench Plain Native)"
+    action: "run_pipeline"
+    subject: "anzar.cmd.{cluster}.{host}.workflow.run_pipeline"
+    payload:
+      context_id: "e2e-job-app-bench-plain-native-002"
+      env_id: "env-app-bench-plain-native"
+      git_config:
+        repo_url: "https://github.com/rsanzar/java.git" # <-- your repo
+        branch: "main"
+        commit_hash: "FETCH_HEAD"
+        app_name: "bench-plain-native"
+
+  - name: "Shiroe: Stage CD Deployment (Bench Plain Native on Naked)"
+    action: "stage_deployment"
+    subject: "anzar.cmd.{cluster}.{host}.workflow.stage_deployment"
+    payload:
+      context_id: "e2e-cd-stage-bench-plain-native-001"
+      parent_env_id: "env-app-bench-plain-native"
+      cd_env_id: "cd-env-prod-bench-plain-native"
+      app_domain: "bench-plain-native.sadala.anzar.cloud"
+      compute:
+        type: "serverless"
+  #              scaling:
+  #                  policy: "fixed"
+  #                  instances: 1
+  #              load_balancer: "round_robin"
+
+  - name: "Bifrost & Shiroe: Traffic Verification (Bench Plain Native)"
+    action: "simulate_traffic"
+    subject: "none"
+    payload:
+      app_domain: "bench-plain-native.sadala.anzar.cloud"
+      target: "127.0.0.1"
+      requests: 10
+
+  # ==========================================
+  # APP 6: BENCH QUARKUS (GraalVM native)  (graal-native-latest -> Naked VM)
+  # ==========================================
+  - name: "Engine: Prepare Environment (Bench Quarkus Native)"
+    action: "prepare_env"
+    subject: "anzar.cmd.{cluster}.{host}.engine.env.prepare"
+    payload:
+      context_id: "e2e-job-app-bench-quarkus-native-001"
+      env_id: "env-app-bench-quarkus-native"
+      runtime: "graal-native-latest"
+      tshirt: "large"
+
+  - name: "Shiroe: Orchestrate Pipeline Saga (Bench Quarkus Native)"
+    action: "run_pipeline"
+    subject: "anzar.cmd.{cluster}.{host}.workflow.run_pipeline"
+    payload:
+      context_id: "e2e-job-app-bench-quarkus-native-002"
+      env_id: "env-app-bench-quarkus-native"
+      git_config:
+        repo_url: "https://github.com/rsanzar/java.git" # <-- your repo
+        branch: "main"
+        commit_hash: "FETCH_HEAD"
+        app_name: "bench-quarkus-native"
+
+  - name: "Shiroe: Stage CD Deployment (Bench Quarkus Native on Naked)"
+    action: "stage_deployment"
+    subject: "anzar.cmd.{cluster}.{host}.workflow.stage_deployment"
+    payload:
+      context_id: "e2e-cd-stage-bench-quarkus-native-001"
+      parent_env_id: "env-app-bench-quarkus-native"
+      cd_env_id: "cd-env-prod-bench-quarkus-native"
+      app_domain: "bench-quarkus-native.sadala.anzar.cloud"
+      compute:
+        type: "serverless"
+  #              scaling:
+  #                  policy: "fixed"
+  #                  instances: 1
+  #              load_balancer: "round_robin"
+
+  - name: "Bifrost & Shiroe: Traffic Verification (Bench Quarkus Native)"
+    action: "simulate_traffic"
+    subject: "none"
+    payload:
+      app_domain: "bench-quarkus-native.sadala.anzar.cloud"
       target: "127.0.0.1"
       requests: 10
