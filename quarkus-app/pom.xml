@@ -87,8 +87,8 @@
             <properties>
                 <quarkus.native.enabled>true</quarkus.native.enabled>
                 <quarkus.package.jar.enabled>false</quarkus.package.jar.enabled>
-                <!-- fully static musl binary: runs on plain alpine (naked-latest) -->
-                <quarkus.native.additional-build-args>--static,--libc=musl</quarkus.native.additional-build-args>
+                <!-- musl native binary: runs on plain alpine (naked-latest) -->
+                <quarkus.native.additional-build-args>--no-fallback</quarkus.native.additional-build-args>
             </properties>
         </profile>
     </profiles>

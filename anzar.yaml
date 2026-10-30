@@ -1,6 +1,6 @@
 # Benchmark matrix: 3 frameworks x 2 modes = 6 apps
 #
-#                  | JVM (Temurin 21 JRE)  | GraalVM native (static musl)
+#                  | JVM (Temurin 21 JRE)  | GraalVM native (musl binary)
 #   Spring Boot    | bench-spring          | bench-spring-native
 #   Plain Java     | bench-plain           | bench-plain-native
 #   Quarkus        | bench-quarkus         | bench-quarkus-native
@@ -95,7 +95,7 @@ apps:
       connection_limit: 500
 
   # ==========================================================================
-  # GRAALVM NATIVE MODE  (fully static musl binaries -> run on plain alpine)
+  # GRAALVM NATIVE MODE  (musl binaries -> run on plain alpine)
   # ==========================================================================
 
   # ---------- Spring Boot (native) ----------
@@ -106,8 +106,8 @@ apps:
           runtime: graal-native-latest
           tshirt: ci-heavy
           commands:
-            # 1. Spring AOT + native-image (static musl, Maven on PATH)
-            - mvn -B -e -f spring-app/pom.xml -Pnative,musl -DskipTests native:compile
+            # 1. Spring AOT + native-image (Liberica NIK musl, Maven on PATH)
+            - mvn -B -e -f spring-app/pom.xml -Pnative -DskipTests native:compile
             # 2. Copy binary to persistent /app drive
             - mkdir -p /app/spring-native
             - cp spring-app/target/bench-spring /app/spring-native/bench-spring
@@ -136,8 +136,8 @@ apps:
           commands:
             # 1. Compile classes
             - cd plain-app && rm -rf out && javac --release 21 -d out src/main/java/bench/plain/Main.java
-            # 2. native-image (static musl, no Maven needed)
-            - cd plain-app && native-image --static --libc=musl -cp out bench.plain.Main -o bench-plain
+            # 2. native-image (no-fallback, no Maven needed)
+            - cd plain-app && native-image --no-fallback -cp out bench.plain.Main -o bench-plain
             # 3. Copy binary to persistent /app drive
             - mkdir -p /app/plain-native
             - cp plain-app/bench-plain /app/plain-native/bench-plain
@@ -164,7 +164,7 @@ apps:
           runtime: graal-native-latest
           tshirt: ci-heavy
           commands:
-            # 1. Quarkus native build; "-Dnative" activates the pom profile (static musl args included)
+            # 1. Quarkus native build; "-Dnative" activates the pom profile
             - mvn -B -e -f quarkus-app/pom.xml -Dnative -DskipTests package
             # 2. Copy binary to persistent /app drive
             - mkdir -p /app/quarkus-native
