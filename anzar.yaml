@@ -168,7 +168,7 @@ apps:
             - mvn -B -e -f quarkus-app/pom.xml -Dnative -DskipTests package
             # 2. Copy binary to persistent /app drive
             - mkdir -p /app/quarkus-native
-            - cp quarkus-app/target/bench-quarkus-1.0.0-runner /app/quarkus-native/bench-quarkus
+            - cp quarkus-app/target/*runner /app/quarkus-native/bench-quarkus
             - chmod +x /app/quarkus-native/bench-quarkus
 
     cd:
