@@ -109,7 +109,7 @@ apps:
           tshirt: ci-heavy
           commands:
             # 0. Install net tools & build utilities inside the VM
-            - apk update && apk add --no-cache net-tools iproute2 procps socat iptables e2fsprogs ca-certificates curl maven bash
+            - apk add --no-cache maven
             # 1. Spring AOT + native-image (static musl)
             - sh mvnw -B -q -f spring-app/pom.xml -Pnative,musl -DskipTests native:compile || mvn -B -q -f spring-app/pom.xml -Pnative,musl -DskipTests native:compile
             # 2. Copy binary to persistent /app drive
