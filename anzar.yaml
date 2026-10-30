@@ -97,7 +97,7 @@ apps:
   # ==========================================================================
   # GRAALVM NATIVE MODE  (fully static musl binaries -> run on plain alpine)
   # NOTE: native-image is RAM hungry (Spring ~4-8 GB, Quarkus ~3-6 GB).
-  #       CI jobs use tshirt "large" (4 GB VM).
+  #       CI jobs use tshirt "ci-heavy" (4 GB VM).
   # ==========================================================================
 
   # ---------- Spring Boot (native) ----------
@@ -106,7 +106,7 @@ apps:
       jobs:
         - name: build-spring-native
           runtime: graal-native-latest
-          tshirt: large
+          tshirt: ci-heavy
           commands:
             # 1. Spring AOT + native-image (static musl). mvnw bootstraps Maven into /root/.m2/wrapper
             - sh mvnw -B -q -f spring-app/pom.xml -Pnative,musl -DskipTests native:compile
@@ -134,7 +134,7 @@ apps:
       jobs:
         - name: build-plain-native
           runtime: graal-native-latest
-          tshirt: large
+          tshirt: ci-heavy
           commands:
             # 1. Compile classes
             - cd plain-app && rm -rf out && javac --release 21 -d out src/main/java/bench/plain/Main.java
@@ -164,7 +164,7 @@ apps:
       jobs:
         - name: build-quarkus-native
           runtime: graal-native-latest
-          tshirt: large
+          tshirt: ci-heavy
           commands:
             # 1. Quarkus native build; "-Dnative" activates the pom profile (static musl args included)
             - sh mvnw -B -q -f quarkus-app/pom.xml -Dnative -DskipTests package
