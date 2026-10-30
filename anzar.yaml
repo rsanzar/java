@@ -97,7 +97,7 @@ apps:
   # ==========================================================================
   # GRAALVM NATIVE MODE  (fully static musl binaries -> run on plain alpine)
   # NOTE: native-image is RAM hungry (Spring ~4-8 GB, Quarkus ~3-6 GB).
-  #       CI jobs use tshirt "large" (4 GB VM).
+  #       CI jobs use tshirt "ci-heavy" (4 GB VM).
   # ==========================================================================
 
   # ---------- Spring Boot (native) ----------
@@ -106,7 +106,7 @@ apps:
       jobs:
         - name: build-spring-native
           runtime: graal-native-latest
-          tshirt: large
+          tshirt: ci-heavy
           commands:
             # 0. Install net tools & build utilities inside the VM
             - apk update && apk add --no-cache net-tools iproute2 procps socat iptables e2fsprogs ca-certificates curl maven bash
@@ -136,7 +136,7 @@ apps:
       jobs:
         - name: build-plain-native
           runtime: graal-native-latest
-          tshirt: large
+          tshirt: ci-heavy
           commands:
             # 0. Install net tools & build utilities inside the VM
             - apk update && apk add --no-cache net-tools iproute2 procps socat iptables e2fsprogs ca-certificates curl maven bash
@@ -168,7 +168,7 @@ apps:
       jobs:
         - name: build-quarkus-native
           runtime: graal-native-latest
-          tshirt: large
+          tshirt: ci-heavy
           commands:
             # 0. Install net tools & build utilities inside the VM
             - apk update && apk add --no-cache net-tools iproute2 procps socat iptables e2fsprogs ca-certificates curl maven bash
