@@ -30,7 +30,7 @@ apps:
     cd:
       runtime: java-jre-latest
       tshirt: standard
-      type: warm
+      type: snapstart
       start_commands:
         - sysctl -w net.ipv4.ip_local_port_range="1024 65535" || true
         - sysctl -w net.ipv4.tcp_tw_reuse=1 || true
@@ -57,7 +57,7 @@ apps:
     cd:
       runtime: java-jre-latest
       tshirt: standard
-      type: warm
+      type: snapstart
       start_commands:
         - sysctl -w net.ipv4.ip_local_port_range="1024 65535" || true
         - sysctl -w net.ipv4.tcp_tw_reuse=1 || true
@@ -84,7 +84,7 @@ apps:
     cd:
       runtime: java-jre-latest
       tshirt: standard
-      type: warm
+      type: snapstart
       start_commands:
         - sysctl -w net.ipv4.ip_local_port_range="1024 65535" || true
         - sysctl -w net.ipv4.tcp_tw_reuse=1 || true
@@ -116,7 +116,7 @@ apps:
     cd:
       runtime: naked-latest
       tshirt: standard
-      type: warm
+      type: snapstart
       start_commands:
         - sysctl -w net.ipv4.ip_local_port_range="1024 65535" || true
         - sysctl -w net.ipv4.tcp_tw_reuse=1 || true
@@ -146,7 +146,7 @@ apps:
     cd:
       runtime: naked-latest
       tshirt: standard
-      type: warm
+      type: snapstart
       start_commands:
         - sysctl -w net.ipv4.ip_local_port_range="1024 65535" || true
         - sysctl -w net.ipv4.tcp_tw_reuse=1 || true
@@ -174,7 +174,7 @@ apps:
     cd:
       runtime: naked-latest
       tshirt: standard
-      type: warm
+      type: snapstart
       start_commands:
         - sysctl -w net.ipv4.ip_local_port_range="1024 65535" || true
         - sysctl -w net.ipv4.tcp_tw_reuse=1 || true
