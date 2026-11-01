@@ -1,5 +1,30 @@
 # Benchmark matrix: {spring, plain, quarkus} x {JVM, GraalVM native} + Unikraft = 7 apps
-forge: []
+forge:
+  # ==========================================
+  # 4. UNIKRAFT BUILDER: Maven 3.9 + Temurin JDK 21 (Alpine) + KraftKit
+  # ==========================================
+  - name: "Forge: Build Base Image (Unikraft Builder)"
+    action: "build_image"
+    subject: "anzar.cmd.{cluster}.{host}.image.build"
+    payload:
+      context_id: "e2e-job-bench-unikraft-001"
+      image_name: "unikraft-builder-latest"
+      docker_source: "maven:3.9-eclipse-temurin-21-alpine"
+      disk_size: "4G"
+      init_binary_path: "/home/manneta/projects/anzar/target/release/anzar-init"
+      cache_mounts:
+        - /tmp
+        - /root/.m2
+        - /root/.unikraft
+
+  - name: "Forge: Build Snapshot (Unikraft Builder)"
+    action: "build_snapshot"
+    subject: "anzar.cmd.{cluster}.{host}.snapshot.build"
+    payload:
+      context_id: "e2e-job-bench-unikraft-002"
+      env_id: "env-dev-unikraft-builder-42"
+      runtime: "unikraft-builder-latest"
+      tshirt: "ci-heavy"
 
 app:
   # ==========================================
@@ -11,8 +36,8 @@ app:
     payload:
       context_id: "e2e-job-app-bench-spring-unikraft-001"
       env_id: "env-app-bench-spring-unikraft"
-      runtime: "docker-tools"
-      tshirt: "large"
+      runtime: "unikraft-builder-latest"
+      tshirt: "ci-heavy"
 
   - name: "Shiroe: Orchestrate Pipeline Saga (Bench Spring Unikraft)"
     action: "run_pipeline"

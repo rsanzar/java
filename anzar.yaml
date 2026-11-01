@@ -194,21 +194,33 @@ apps:
       jobs:
         - name: build-spring-unikraft
           type: unikernel
-          runtime: docker-tools
-          tshirt: large
+          runtime: unikraft-builder-latest
+          tshirt: ci-heavy
           artifacts:
             unikernel: "unikernel"
             cpio: "initramfs-x86_64.cpio"
           commands:
-            - echo "🐳 Verifying / Starting Docker daemon..."
-            - sh -c 'if ! docker info >/dev/null 2>&1; then mkdir -p /sys/fs/cgroup && mount -t tmpfs -o uid=0,gid=0,mode=0755 cgroup /sys/fs/cgroup && for s in $(awk "!/^#/ { if (\$4 == 1) print \$1 }" /proc/cgroups); do mkdir -p /sys/fs/cgroup/$s && mount -t cgroup -o $s cgroup /sys/fs/cgroup/$s || true; done && mkdir -p /sys/fs/cgroup/unified && mount -t cgroup2 none /sys/fs/cgroup/unified 2>/dev/null || true; mkdir -p /cache/docker && dockerd --data-root=/cache/docker --host=unix:///var/run/docker.sock --iptables=false --storage-driver=overlay2 > /var/log/dockerd.log 2>&1 & i=0; while ! docker info >/dev/null 2>&1; do sleep 0.2; i=$((i+1)); if [ $i -ge 50 ]; then echo "DOCKERD FAILED TO START:"; cat /var/log/dockerd.log; exit 1; fi; done; fi'
-            - echo "🔨 Building Spring Boot Unikernel artifacts inside Docker..."
-            - cd spring-unikraft && docker build -t spring-unikraft-artifacts -f Dockerfile.build .
-            - echo "📦 Extracting artifacts from Docker container..."
+            - echo "🚀 Preparing Unikraft build tools on Alpine..."
+            - which kraft >/dev/null 2>&1 || (curl -sL https://github.com/unikraft/kraftkit/releases/download/v0.12.16/kraft_0.12.16_linux_amd64.tar.gz | tar -xz -C /usr/local/bin kraft && chmod +x /usr/local/bin/kraft && ln -sf /usr/local/bin/kraft /usr/bin/kraft)
+            - kraft version
+            - echo "📦 Building Spring Boot application JAR..."
+            - cd spring-unikraft && mvn -B -q -DskipTests package
+            - echo "📂 Staging rootfs for Unikraft initramfs..."
+            - rm -rf spring-unikraft/rootfs && mkdir -p spring-unikraft/rootfs/usr/bin spring-unikraft/rootfs/lib spring-unikraft/rootfs/usr/lib spring-unikraft/rootfs/etc spring-unikraft/rootfs/tmp
+            - cp spring-unikraft/target/bench-spring-unikraft.jar spring-unikraft/rootfs/app.jar
+            - cp -a /opt spring-unikraft/rootfs/ 2>/dev/null || true
+            - cp -a /lib/. spring-unikraft/rootfs/lib/ 2>/dev/null || true
+            - cp -a /usr/lib/. spring-unikraft/rootfs/usr/lib/ 2>/dev/null || true
+            - cp -a /etc/ssl /etc/ca-certificates spring-unikraft/rootfs/etc/ 2>/dev/null || true
+            - ln -sf /opt/java/openjdk/bin/java spring-unikraft/rootfs/usr/bin/java 2>/dev/null || cp $(which java) spring-unikraft/rootfs/usr/bin/java
+            - echo "🔨 Building Unikraft unikernel & initramfs..."
+            - cd spring-unikraft && (kraft pkg pull unikraft.org/base:latest --plat fc --arch x86_64 || kraft pkg pull unikraft.org/base:latest --plat qemu --arch x86_64 || true)
+            - cd spring-unikraft && (kraft build --plat fc --arch x86_64 || kraft build --plat qemu --arch x86_64 || kraft build)
             - mkdir -p /workspace
-            - sh -c 'CID=$(docker create spring-unikraft-artifacts) && docker cp $CID:/unikernel /workspace/unikernel && docker cp $CID:/initramfs-x86_64.cpio /workspace/initramfs-x86_64.cpio && docker rm $CID'
+            - sh -c 'KERNEL_BIN=$(find /root/.local/share/kraftkit/runtime spring-unikraft/.unikraft -type f \( -name "kernel" -o -name "*_fc-x86_64" -o -name "*_qemu-x86_64" \) ! -name "*.dbg" 2>/dev/null | head -n 1); echo "Found kernel at: $KERNEL_BIN"; cp "$KERNEL_BIN" /workspace/unikernel && chmod +x /workspace/unikernel'
+            - cp spring-unikraft/.unikraft/build/initramfs-x86_64.cpio /workspace/initramfs-x86_64.cpio
             - ls -lh /workspace/unikernel /workspace/initramfs-x86_64.cpio
-            - echo "✅ Success! Unikernel and CPIO ready in /workspace."
+            - echo "✅ Unikraft unikernel artifacts ready!"
 
     cd:
       type: unikernel
