@@ -214,7 +214,8 @@ apps:
             - cp -a /etc/ssl /etc/ca-certificates spring-unikraft/rootfs/etc/ 2>/dev/null || true
             - ln -sf /opt/java/openjdk/bin/java spring-unikraft/rootfs/usr/bin/java 2>/dev/null || cp $(which java) spring-unikraft/rootfs/usr/bin/java
             - echo "🔨 Building Unikraft unikernel & initramfs..."
-            - cd spring-unikraft && kraft build --target fc/x86_64 || (cd spring-unikraft && kraft build)
+            - cd spring-unikraft && (kraft pkg pull unikraft.org/base:latest --plat fc --arch x86_64 || kraft pkg pull unikraft.org/base:latest --plat qemu --arch x86_64 || true)
+            - cd spring-unikraft && (kraft build --plat fc --arch x86_64 || kraft build --plat qemu --arch x86_64 || kraft build)
             - mkdir -p /workspace
             - cp spring-unikraft/.unikraft/build/*_fc-x86_64 /workspace/unikernel 2>/dev/null || cp spring-unikraft/.unikraft/build/unikernel /workspace/unikernel 2>/dev/null || cp spring-unikraft/.unikraft/build/*_qemu-x86_64 /workspace/unikernel
             - cp spring-unikraft/.unikraft/build/initramfs-x86_64.cpio /workspace/initramfs-x86_64.cpio
