@@ -1,12 +1,12 @@
-# Benchmark matrix: 3 frameworks x 2 modes = 6 apps
+# Benchmark matrix: 3 frameworks x (JVM, GraalVM native) + Unikraft Unikernel = 7 apps
 #
-#                  | JVM (Temurin 21 JRE)  | GraalVM native (musl binary)
-#   Spring Boot    | bench-spring          | bench-spring-native
-#   Plain Java     | bench-plain           | bench-plain-native
-#   Quarkus        | bench-quarkus         | bench-quarkus-native
+#                  | JVM (Temurin 21 JRE)  | GraalVM native (musl binary) | Unikraft Unikernel
+#   Spring Boot    | bench-spring          | bench-spring-native          | bench-spring-unikraft
+#   Plain Java     | bench-plain           | bench-plain-native           | -
+#   Quarkus        | bench-quarkus         | bench-quarkus-native         | -
 #
-# Builder runtimes:  java-maven-latest (JVM jars)   graal-native-latest (native binaries)
-# Runner runtimes:   java-jre-latest   (JVM apps)   naked-latest        (native apps, plain alpine)
+# Builder runtimes:  java-maven-latest (JVM jars)   graal-native-latest (native binaries)   unikraft-builder-latest (unikraft unikernel)
+# Runner runtimes:   java-jre-latest   (JVM apps)   naked-latest        (native apps)       direct unikernel boot (unikraft)
 
 apps:
   # ==========================================================================
@@ -183,3 +183,32 @@ apps:
         - sh -c 'ulimit -n 65535 && exec /app/quarkus-native/bench-quarkus -Dquarkus.http.host=0.0.0.0 -Dquarkus.http.port=8080'
       port: 8080
       connection_limit: 500
+
+  # ==========================================================================
+  # UNIKRAFT UNIKERNEL MODE
+  # ==========================================================================
+
+  # ---------- Spring Boot (Unikraft Unikernel) ----------
+  bench-spring-unikraft:
+    ci:
+      jobs:
+        - name: build-spring-unikraft
+          type: unikernel
+          runtime: unikraft-builder-latest
+          tshirt: ci-heavy
+          artifacts:
+            unikernel: "unikernel"
+            cpio: "initramfs-x86_64.cpio"
+          commands:
+            - echo "🚀 Building Spring Boot Unikraft unikernel..."
+            - cd spring-unikraft && kraft build --target fc/x86_64 || (cd spring-unikraft && kraft build)
+            - cp spring-unikraft/.unikraft/build/*_fc-x86_64 /workspace/unikernel 2>/dev/null || cp spring-unikraft/.unikraft/build/unikernel /workspace/unikernel 2>/dev/null || cp spring-unikraft/.unikraft/build/*_qemu-x86_64 /workspace/unikernel
+            - cp spring-unikraft/.unikraft/build/initramfs-x86_64.cpio /workspace/initramfs-x86_64.cpio
+            - ls -lh /workspace/unikernel /workspace/initramfs-x86_64.cpio
+            - echo "✅ Unikraft unikernel artifacts ready!"
+
+    cd:
+      type: unikernel
+      tshirt: standard
+      port: 8080
+      boot_args: 'vfs.fstab=["initrd0:/:extract:::"] -- /usr/bin/java -XX:+UseSerialGC -XX:MaxRAMPercentage=75 -jar /app.jar --server.address=0.0.0.0 --server.port=8080'

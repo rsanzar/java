@@ -1,0 +1,13 @@
+spec: v0.7
+
+runtime: base-compat:latest
+
+targets:
+  - fc/x86_64
+  - qemu/x86_64
+
+rootfs:
+  source: ./Dockerfile
+  format: cpio
+
+cmd: ["/usr/bin/java", "-XX:+UseSerialGC", "-XX:MaxRAMPercentage=75", "-jar", "/app.jar", "--server.address=0.0.0.0", "--server.port=8080"]

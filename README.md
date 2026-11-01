@@ -18,16 +18,28 @@ startup time measured inside the guest separately from the end-to-end time measu
 |---|---|---|
 | `java-maven-latest` | `maven:3.9-eclipse-temurin-21-alpine` | CI: builds the JVM jars |
 | `java-jre-latest` | `eclipse-temurin:21-jre-alpine` | CD: runs the JVM apps |
-| `graal-native-latest` | `ghcr.io/graalvm/native-image-community:21-muslib` | CI: builds the native binaries (GraalVM CE 21 + musl toolchain) |
 | `naked-latest` | `alpine` | CD: runs the native apps (fully static binaries, no JVM) |
+| `graal-native-latest` | `localhost:5000/graal-native-latest` | CI: builds native binaries (**GraalVM CE 21 muslib + VSOCK net-tools**) |
 
-The GraalVM image has no Maven, so the native builds use the repo's `./mvnw`. It downloads Maven 3.9.9
-into `/root/.m2/wrapper`, which is a cache mount. If the image has no curl/wget, mvnw falls back to `javac`.
+### Building `graal-native-latest`
+
+The Dockerfile is [Dockerfile.graal-native](file:///Users/manneta/java/Dockerfile.graal-native). It builds on `ghcr.io/graalvm/native-image-community:21-muslib` and installs the required networking and VSOCK tools (`net-tools` for `ifconfig`, `iproute` for `ip`, `socat` for VSOCK, `procps-ng`, etc.) plus Maven:
+
+```sh
+# 1. Build & tag for your registry
+docker build -t localhost:5000/graal-native-latest -f Dockerfile.graal-native .
+
+# 2. Push to your local registry
+docker push localhost:5000/graal-native-latest
+```
+
+---
 
 ## Files
 
 - `anzar.yaml`: the 6 apps, each with CI build commands and CD start commands
-- `forge-java.yaml`: `build_image`/`build_snapshot` for the 4 runtimes, plus `prepare_env` → `run_pipeline` → `stage_deployment` → `simulate_traffic` for the 6 apps
+- `forge-java.yaml`: `build_image`/`build_snapshot` for the runtimes, plus `prepare_env` → `run_pipeline` → `stage_deployment` → `simulate_traffic` for the 6 apps
+- `Dockerfile.graal-native`: GraalVM CE 21 muslib image with `net-tools`, `iproute`, `socat`, `procps-ng`, `iptables`, `e2fsprogs`, `ca-certificates`, `curl`, and `maven`
 
 ## Build commands (CI, run from repo root)
 
@@ -38,9 +50,9 @@ cd quarkus-app && mvn -B -q -DskipTests package           # -> quarkus-app/targe
 cd plain-app   && javac --release 21 -d out src/main/java/bench/plain/Main.java \
                && jar --create --file app.jar --main-class bench.plain.Main -C out .
 
-# ---- Native (graal-native-latest) ----
-sh mvnw -B -q -f spring-app/pom.xml  -Pnative,musl -DskipTests native:compile   # -> spring-app/target/bench-spring
-sh mvnw -B -q -f quarkus-app/pom.xml -Dnative      -DskipTests package          # -> quarkus-app/target/bench-quarkus-1.0.0-runner
+# ---- Native (graal-native-latest, Maven on PATH) ----
+mvn -B -e -f spring-app/pom.xml  -Pnative,musl -DskipTests native:compile   # -> spring-app/target/bench-spring
+mvn -B -e -f quarkus-app/pom.xml -Dnative      -DskipTests package          # -> quarkus-app/target/bench-quarkus-1.0.0-runner
 cd plain-app && native-image --static --libc=musl -cp out bench.plain.Main -o bench-plain
 ```
 
@@ -63,7 +75,7 @@ java $JAVA_FLAGS -Dquarkus.http.host=0.0.0.0 -Dquarkus.http.port=8080 -jar /app/
 ## Notes
 
 - **Same GC in both modes:** GraalVM CE native binaries always use the Serial GC. The JVM apps are pinned to `-XX:+UseSerialGC` so the two modes compare like for like.
-- **RAM for native builds:** native-image needs a lot of memory (roughly 4–8 GB for Spring, 3–6 GB for Quarkus). The native CI jobs use tshirt `large` (4 GB VM).
+- **RAM for native builds:** native-image needs a lot of memory (roughly 4–8 GB for Spring, 3–6 GB for Quarkus). The native CI jobs use tshirt `ci-heavy` (4 GB VM).
 - **CPU features:** native binaries are compiled for x86-64-v3 (AVX2) by default. If a host CPU or a Firecracker CPU template hides AVX2, add `-march=compatibility`:
   - Spring: add it as another `buildArg` in the `musl` profile.
   - Quarkus: append it to `quarkus.native.additional-build-args`.
