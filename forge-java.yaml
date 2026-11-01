@@ -418,8 +418,8 @@ app:
     payload:
       context_id: "e2e-job-app-bench-spring-unikraft-001"
       env_id: "env-app-bench-spring-unikraft"
-      runtime: "unikraft-builder-latest"
-      tshirt: "ci-heavy"
+      runtime: "docker-tools"
+      tshirt: "large"
 
   - name: "Shiroe: Orchestrate Pipeline Saga (Bench Spring Unikraft)"
     action: "run_pipeline"
