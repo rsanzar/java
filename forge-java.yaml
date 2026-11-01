@@ -84,7 +84,7 @@ forge:
     payload:
       context_id: "e2e-job-bench-unikraft-001"
       image_name: "unikraft-builder-latest"
-      docker_source: "kraftkit.sh/base:latest"
+      docker_source: "maven:3.9-eclipse-temurin-21-alpine"
       disk_size: "4G"
       init_binary_path: "/home/manneta/projects/anzar/target/release/anzar-init"
       cache_mounts:

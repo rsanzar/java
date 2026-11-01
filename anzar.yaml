@@ -200,8 +200,22 @@ apps:
             unikernel: "unikernel"
             cpio: "initramfs-x86_64.cpio"
           commands:
-            - echo "🚀 Building Spring Boot Unikraft unikernel..."
+            - echo "🚀 Preparing Unikraft build environment..."
+            - which kraft >/dev/null 2>&1 || (curl --proto '=https' --tlsv1.2 -sSf https://get.kraftkit.sh | sh)
+            - kraft version
+            - echo "📦 Building Spring Boot application JAR..."
+            - cd spring-unikraft && mvn -B -q -DskipTests package
+            - echo "📂 Staging rootfs for Unikraft initramfs..."
+            - rm -rf spring-unikraft/rootfs && mkdir -p spring-unikraft/rootfs/usr/bin spring-unikraft/rootfs/lib spring-unikraft/rootfs/usr/lib spring-unikraft/rootfs/etc spring-unikraft/rootfs/tmp
+            - cp spring-unikraft/target/bench-spring-unikraft.jar spring-unikraft/rootfs/app.jar
+            - cp -a /opt spring-unikraft/rootfs/ 2>/dev/null || true
+            - cp -a /lib/. spring-unikraft/rootfs/lib/ 2>/dev/null || true
+            - cp -a /usr/lib/. spring-unikraft/rootfs/usr/lib/ 2>/dev/null || true
+            - cp -a /etc/ssl /etc/ca-certificates spring-unikraft/rootfs/etc/ 2>/dev/null || true
+            - ln -sf /opt/java/openjdk/bin/java spring-unikraft/rootfs/usr/bin/java 2>/dev/null || cp $(which java) spring-unikraft/rootfs/usr/bin/java
+            - echo "🔨 Building Unikraft unikernel & initramfs..."
             - cd spring-unikraft && kraft build --target fc/x86_64 || (cd spring-unikraft && kraft build)
+            - mkdir -p /workspace
             - cp spring-unikraft/.unikraft/build/*_fc-x86_64 /workspace/unikernel 2>/dev/null || cp spring-unikraft/.unikraft/build/unikernel /workspace/unikernel 2>/dev/null || cp spring-unikraft/.unikraft/build/*_qemu-x86_64 /workspace/unikernel
             - cp spring-unikraft/.unikraft/build/initramfs-x86_64.cpio /workspace/initramfs-x86_64.cpio
             - ls -lh /workspace/unikernel /workspace/initramfs-x86_64.cpio
