@@ -1,21 +1,44 @@
 # Benchmark matrix: {spring, plain, quarkus} x {JVM, GraalVM native} + Unikraft = 7 apps
 forge:
   # ==========================================
-  # 4. UNIKRAFT BUILDER: Maven 3.9 + Temurin JDK 21 (Alpine) + KraftKit
+  # 4. UNIKRAFT BUILDER: KraftKit + Docker + BuildKit (Debian Bookworm)
   # ==========================================
   - name: "Forge: Build Base Image (Unikraft Builder)"
     action: "build_image"
     subject: "anzar.cmd.{cluster}.{host}.image.build"
     payload:
       context_id: "e2e-job-bench-unikraft-001"
-      image_name: "unikraft-builder-latest"
-      docker_source: "maven:3.9-eclipse-temurin-21-alpine"
+      image_name: "kraft-builder-v1"
+      dockerfile: |
+        FROM debian:bookworm-slim
+
+        ENV DEBIAN_FRONTEND=noninteractive
+        # 💥 FIX 1: Restored explicit PATH so anzar-init can find system binaries
+        ENV PATH="/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin:${PATH}"
+
+        # 💥 FIX 2: Restored all base dependencies from the working dind-runner (plus cpio)
+        RUN apt-get update && apt-get install -y --no-install-recommends \
+            ca-certificates curl gnupg iptables iproute2 net-tools procps \
+            systemd-sysv e2fsprogs wget git tar unzip cpio \
+            && rm -rf /var/lib/apt/lists/*
+
+        # 2. Install standard Docker CE
+        RUN install -m 0755 -d /etc/apt/keyrings && \
+            curl -fsSL https://download.docker.com/linux/debian/gpg | gpg --dearmor -o /etc/apt/keyrings/docker.gpg && \
+            chmod a+r /etc/apt/keyrings/docker.gpg && \
+            echo "deb [arch=$(dpkg --print-architecture) signed-by=/etc/apt/keyrings/docker.gpg] https://download.docker.com/linux/debian bookworm stable" | tee /etc/apt/sources.list.d/docker.list > /dev/null && \
+            apt-get update && apt-get install -y docker-ce docker-ce-cli containerd.io docker-buildx-plugin && \
+            rm -rf /var/lib/apt/lists/*
+
+        # 3. Install KraftKit (Bypassing the interactive /dev/tty prompt)
+        RUN curl -sSfL https://github.com/unikraft/kraftkit/releases/download/v0.12.14/kraft_0.12.14_linux_amd64.tar.gz | tar -xzf - -C /usr/local/bin kraft
+
+        WORKDIR /workspace
       disk_size: "4G"
       init_binary_path: "/home/manneta/projects/anzar/target/release/anzar-init"
       cache_mounts:
         - /tmp
-        - /root/.m2
-        - /root/.unikraft
+        - /var/lib/docker
 
   - name: "Forge: Build Snapshot (Unikraft Builder)"
     action: "build_snapshot"
@@ -23,8 +46,8 @@ forge:
     payload:
       context_id: "e2e-job-bench-unikraft-002"
       env_id: "env-dev-unikraft-builder-42"
-      runtime: "unikraft-builder-latest"
-      tshirt: "ci-heavy"
+      runtime: "kraft-builder-v1"
+      tshirt: "large"
 
 app:
   # ==========================================
@@ -36,8 +59,8 @@ app:
     payload:
       context_id: "e2e-job-app-bench-spring-unikraft-001"
       env_id: "env-app-bench-spring-unikraft"
-      runtime: "unikraft-builder-latest"
-      tshirt: "ci-heavy"
+      runtime: "kraft-builder-v1"
+      tshirt: "large"
 
   - name: "Shiroe: Orchestrate Pipeline Saga (Bench Spring Unikraft)"
     action: "run_pipeline"
