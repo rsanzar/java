@@ -201,7 +201,7 @@ apps:
             cpio: "initramfs-x86_64.cpio"
           commands:
             - echo "🚀 Preparing Unikraft build environment..."
-            - which kraft >/dev/null 2>&1 || (curl --proto '=https' --tlsv1.2 -sSf https://get.kraftkit.sh | sh)
+            - which kraft >/dev/null 2>&1 || (curl -sL https://github.com/unikraft/kraftkit/releases/download/v0.12.16/kraft_0.12.16_linux_amd64.tar.gz | tar -xz -C /usr/local/bin kraft && chmod +x /usr/local/bin/kraft && ln -sf /usr/local/bin/kraft /usr/bin/kraft)
             - kraft version
             - echo "📦 Building Spring Boot application JAR..."
             - cd spring-unikraft && mvn -B -q -DskipTests package
