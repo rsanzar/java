@@ -217,7 +217,7 @@ apps:
             - cd spring-unikraft && (kraft pkg pull unikraft.org/base:latest --plat fc --arch x86_64 || kraft pkg pull unikraft.org/base:latest --plat qemu --arch x86_64 || true)
             - cd spring-unikraft && (kraft build --plat fc --arch x86_64 || kraft build --plat qemu --arch x86_64 || kraft build)
             - mkdir -p /workspace
-            - 'KERNEL_BIN=$(find /root/.local/share/kraftkit/runtime spring-unikraft/.unikraft -type f \( -name "kernel" -o -name "*_fc-x86_64" -o -name "*_qemu-x86_64" \) ! -name "*.dbg" 2>/dev/null | head -n 1) && echo "Found kernel -> $KERNEL_BIN" && cp "$KERNEL_BIN" /workspace/unikernel && chmod +x /workspace/unikernel'
+            - 'for f in /root/.local/share/kraftkit/runtime/oci/digests/sha256/*; do if tar -tf "$f" 2>/dev/null | grep -q "unikraft/bin/kernel$"; then echo "Extracting kernel from OCI blob $f" && tar -xOf "$f" unikraft/bin/kernel > /workspace/unikernel && chmod +x /workspace/unikernel && break; fi; done && test -s /workspace/unikernel'
             - cp spring-unikraft/.unikraft/build/initramfs-x86_64.cpio /workspace/initramfs-x86_64.cpio
             - ls -lh /workspace/unikernel /workspace/initramfs-x86_64.cpio
             - echo "✅ Unikraft unikernel artifacts ready!"
