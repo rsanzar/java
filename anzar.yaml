@@ -195,7 +195,7 @@ apps:
         - name: build-spring-unikraft
           type: unikernel
           runtime: kraft-builder-v1
-          tshirt: large
+          tshirt: ci-heavy
           artifacts:
             unikernel: "unikernel"
             cpio: "spring-unikraft/.unikraft/build/initramfs-x86_64.cpio"
@@ -217,7 +217,7 @@ apps:
             # 2. Unikraft Build Phase
             - KRAFTKIT_NO_PROMPT=true KRAFTKIT_LOG_TYPE=basic kraft pkg pull -w base unikraft.org/base:latest --plat fc --arch x86_64
             - cp base/unikraft/bin/kernel unikernel
-            - 'cd spring-unikraft && TMPDIR=/workspace/tmp KRAFTKIT_BUILDKIT_HOST=docker-container://buildkitd KRAFTKIT_NO_PROMPT=true KRAFTKIT_LOG_TYPE=basic kraft build --plat fc --arch x86_64'
+            - "cd spring-unikraft && TMPDIR=/workspace/tmp KRAFTKIT_BUILDKIT_HOST=docker-container://buildkitd KRAFTKIT_NO_PROMPT=true KRAFTKIT_LOG_TYPE=basic kraft build --plat fc --arch x86_64"
             - cp spring-unikraft/.unikraft/build/initramfs-x86_64.cpio initramfs-x86_64.cpio || true
 
     cd:

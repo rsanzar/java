@@ -47,7 +47,7 @@ forge:
       context_id: "e2e-job-bench-unikraft-002"
       env_id: "env-dev-unikraft-builder-42"
       runtime: "kraft-builder-v1"
-      tshirt: "large"
+      tshirt: "ci-heavy"
 
 app:
   # ==========================================
@@ -60,7 +60,7 @@ app:
       context_id: "e2e-job-app-bench-spring-unikraft-001"
       env_id: "env-app-bench-spring-unikraft"
       runtime: "kraft-builder-v1"
-      tshirt: "large"
+      tshirt: "ci-heavy"
 
   - name: "Shiroe: Orchestrate Pipeline Saga (Bench Spring Unikraft)"
     action: "run_pipeline"
@@ -95,4 +95,4 @@ app:
     payload:
       app_domain: "bench-spring-unikraft.sadala.anzar.cloud"
       target: "127.0.0.1"
-      requests: 0
+      requests: 10
