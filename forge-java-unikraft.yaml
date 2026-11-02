@@ -84,10 +84,10 @@ app:
       app_domain: "bench-spring-unikraft.sadala.anzar.cloud"
       compute:
         type: "serverless"
-  #        scaling:
-  #          policy: "fixed"
-  #          instances: 1
-  #        load_balancer: "round_robin"
+        scaling:
+          policy: "fixed"
+          instances: 1
+        load_balancer: "round_robin"
 
   - name: "Bifrost & Shiroe: Traffic Verification (Bench Spring Unikraft)"
     action: "simulate_traffic"
