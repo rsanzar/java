@@ -1,6 +1,6 @@
 spec: v0.7
 
-runtime: unikraft.org/base:latest
+runtime: unikraft.org/java:17
 
 targets:
   - fc/x86_64
@@ -10,4 +10,4 @@ rootfs:
   source: ./Dockerfile
   format: cpio
 
-cmd: ["/opt/java/openjdk/bin/java", "-XX:+UseSerialGC", "-XX:MaxRAMPercentage=75", "-jar", "/app.jar", "--server.address=0.0.0.0", "--server.port=8080"]
+cmd: ["/usr/lib/jvm/java-17-openjdk-amd64/bin/java", "-XX:+UseSerialGC", "-Xmx128m", "-jar", "/usr/src/server.jar", "--server.address=0.0.0.0", "--server.port=8080"]

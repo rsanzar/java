@@ -215,7 +215,7 @@ apps:
             - while ! docker top buildkitd > /dev/null 2>&1; do sleep 1; done
 
             # 2. Unikraft Build Phase
-            - KRAFTKIT_NO_PROMPT=true KRAFTKIT_LOG_TYPE=basic kraft pkg pull -w base unikraft.org/base:latest --plat fc --arch x86_64
+            - KRAFTKIT_NO_PROMPT=true KRAFTKIT_LOG_TYPE=basic kraft pkg pull -w base unikraft.org/java:17 --plat fc --arch x86_64
             - cp base/unikraft/bin/kernel unikernel
             - "cd spring-unikraft && TMPDIR=/workspace/tmp KRAFTKIT_BUILDKIT_HOST=docker-container://buildkitd KRAFTKIT_NO_PROMPT=true KRAFTKIT_LOG_TYPE=basic kraft build --plat fc --arch x86_64"
             - cp spring-unikraft/.unikraft/build/initramfs-x86_64.cpio initramfs-x86_64.cpio || true
@@ -224,4 +224,4 @@ apps:
       type: unikernel
       tshirt: standard
       port: 8080
-      boot_args: "-- /opt/java/openjdk/bin/java -XX:+UseSerialGC -Xmx128m -jar /app.jar --server.address=0.0.0.0 --server.port=8080"
+      boot_args: "-- /usr/lib/jvm/java-17-openjdk-amd64/bin/java -XX:+UseSerialGC -Xmx128m -jar /usr/src/server.jar --server.address=0.0.0.0 --server.port=8080"
